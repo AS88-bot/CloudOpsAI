@@ -1,226 +1,126 @@
+
 import express from "express";
-import path from "path";
-import { createServer as createViteServer } from "vite";
 import { GoogleGenAI } from "@google/genai";
 import dotenv from "dotenv";
 
 dotenv.config();
 
-async function startServer() {
-  const app = express();
-  const PORT = 3000;
+const app = express();
 
-  app.use(express.json());
+app.use(express.json({ limit: "10mb" }));
 
-  // Gemini Initialization
-  const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY || "" });
+// Initialize Gemini on the server.
+// Add GEMINI_API_KEY in Vercel → Settings → Environment Variables.
+const ai = new GoogleGenAI({
+  apiKey: process.env.GEMINI_API_KEY || "",
+});
 
-  // API Routes
-  app.get("/api/health", (req, res) => {
-    res.json({ status: "ok", message: "CloudOps AI Backend is live." });
+// Health check
+app.get("/api/health", (_req, res) => {
+  res.json({
+    status: "ok",
+    message: "CloudOps AI server is running",
   });
+});
 
-  // Generic Analysis Endpoint
-  app.post("/api/ai/analyze", async (req, res) => {
-    try {
-      const { type, content, prompt } = req.body;
-      
-      // Use standard model for analysis
-      const model = "gemini-3.5-flash";
-      
-      const customPrompt = prompt || `Analyze this ${type} file for errors, security vulnerabilities, and performance optimizations. Provide a structured response.`;
-
-      const interaction = await ai.interactions.create({
-        model: model,
-        input: `${customPrompt}\n\nFILE CONTENT:\n${content}`
+// Shared Gemini request handler
+async function runGemini(
+  prompt: string,
+  res: express.Response
+) {
+  try {
+    if (!process.env.GEMINI_API_KEY) {
+      return res.status(500).json({
+        error: "GEMINI_API_KEY is not configured",
       });
-
-      let fullOutput = "";
-      for (const step of interaction.steps) {
-        if (step.type === 'model_output') {
-          const textContent = step.content?.find(c => c.type === 'text');
-          if (textContent && textContent.text) {
-            fullOutput += textContent.text;
-          }
-        }
-      }
-
-      res.json({ result: fullOutput });
-    } catch (error: any) {
-      console.error("AI Error:", error);
-      res.status(500).json({ error: error.message });
     }
-  });
 
-  // Security Audit Endpoint
-  app.post("/api/ai/security-audit", async (req, res) => {
-    try {
-      const { content } = req.body;
-      const interaction = await ai.interactions.create({
-        model: "gemini-3.5-flash",
-        input: `Perform a deep security audit on the following cloud configuration or code. Identify secrets, insecure ports, and weak IAM policies.\n\nCONTENT:\n${content}`
-      });
-
-      let fullOutput = "";
-      for (const step of interaction.steps) {
-        if (step.type === 'model_output') {
-          const textContent = step.content?.find(c => c.type === 'text');
-          if (textContent && textContent.text) {
-            fullOutput += textContent.text;
-          }
-        }
-      }
-      res.json({ result: fullOutput });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Cost Optimization Endpoint
-  app.post("/api/ai/cost-optimize", async (req, res) => {
-    try {
-      const { content } = req.body;
-      const interaction = await ai.interactions.create({
-        model: "gemini-3.5-flash",
-        input: `Analyze the following cloud infrastructure for cost optimization. Identify idle services, expensive configurations, and wasted resources. Provide specific dollar-saving recommendations.\n\nCONTENT:\n${content}`
-      });
-
-      let fullOutput = "";
-      for (const step of interaction.steps) {
-        if (step.type === 'model_output') {
-          const textContent = step.content?.find(c => c.type === 'text');
-          if (textContent && textContent.text) {
-            fullOutput += textContent.text;
-          }
-        }
-      }
-      res.json({ result: fullOutput });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Log Analyzer Endpoint
-  app.post("/api/ai/analyze-logs", async (req, res) => {
-    try {
-      const { content } = req.body;
-      const interaction = await ai.interactions.create({
-        model: "gemini-3.5-flash",
-        input: `You are an expert DevOps SRE. Analyze these logs to identify failures, root causes, and severity. Generate a brief incident report with debugging steps.\n\nLOGS:\n${content}`
-      });
-
-      let fullOutput = "";
-      for (const step of interaction.steps) {
-        if (step.type === 'model_output') {
-          const textContent = step.content?.find(c => c.type === 'text');
-          if (textContent && textContent.text) {
-            fullOutput += textContent.text;
-          }
-        }
-      }
-      res.json({ result: fullOutput });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Architecture Generator Endpoint
-  app.post("/api/ai/generate-architecture", async (req, res) => {
-    try {
-      const { prompt } = req.body;
-      const interaction = await ai.interactions.create({
-        model: "gemini-3.5-flash",
-        input: `Based on the following request, generate a professional Google Cloud Architecture blueprint. Include: 
-        1. Recommended services 
-        2. Technology stack 
-        3. Estimated monthly cost 
-        4. Scaling strategy 
-        5. Mermaid.js diagram code for the architecture.
-        
-        REQUEST: ${prompt}`
-      });
-
-      let fullOutput = "";
-      for (const step of interaction.steps) {
-        if (step.type === 'model_output') {
-          const textContent = step.content?.find(c => c.type === 'text');
-          if (textContent && textContent.text) {
-            fullOutput += textContent.text;
-          }
-        }
-      }
-      res.json({ result: fullOutput });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Documentation Generator Endpoint
-  app.post("/api/ai/generate-docs", async (req, res) => {
-    try {
-      const { content } = req.body;
-      const interaction = await ai.interactions.create({
-        model: "gemini-3.5-flash",
-        input: `You are a technical writer. Generate professional documentation (README, Architecture, Deployment Guide) for the following project code/configuration:\n\nCONTENT:\n${content}`
-      });
-
-      let fullOutput = "";
-      for (const step of interaction.steps) {
-        if (step.type === 'model_output') {
-          const textContent = step.content?.find(c => c.type === 'text');
-          if (textContent && textContent.text) {
-            fullOutput += textContent.text;
-          }
-        }
-      }
-      res.json({ result: fullOutput });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Interview Coach Endpoint
-  app.post("/api/ai/interview-coach", async (req, res) => {
-    try {
-      const { topic } = req.body;
-      const interaction = await ai.interactions.create({
-        model: "gemini-3.5-flash",
-        input: `Generate 5 high-level cloud engineering/DevOps interview questions about ${topic}. Include system design and troubleshooting scenarios.`
-      });
-
-      let fullOutput = "";
-      for (const step of interaction.steps) {
-        if (step.type === 'model_output') {
-          const textContent = step.content?.find(c => c.type === 'text');
-          if (textContent && textContent.text) {
-            fullOutput += textContent.text;
-          }
-        }
-      }
-      res.json({ result: fullOutput });
-    } catch (error: any) {
-      res.status(500).json({ error: error.message });
-    }
-  });
-
-  // Vite middleware for development
-  if (process.env.NODE_ENV !== "production") {
-    const vite = await createViteServer({
-      server: { middlewareMode: true },
-      appType: "spa",
+    const response = await ai.models.generateContent({
+      model: "gemini-2.5-flash",
+      contents: prompt,
     });
-    app.use(vite.middlewares);
-  } else {
-    const distPath = path.join(process.cwd(), 'dist');
-    app.use(express.static(distPath));
-    app.get('*', (req, res) => {
-      res.sendFile(path.join(distPath, 'index.html'));
+
+    return res.json({
+      result: response.text || "",
+    });
+  } catch (error) {
+    console.error("Gemini API error:", error);
+
+    return res.status(500).json({
+      error: "AI request failed",
     });
   }
-
-  app.listen(PORT, "0.0.0.0", () => {
-    console.log(`CloudOps AI Server running at http://localhost:${PORT}`);
-  });
 }
 
-startServer();
+// Infrastructure analyzer
+app.post("/api/ai/analyze", async (req, res) => {
+  const { prompt, infrastructure, data } = req.body ?? {};
+
+  return runGemini(
+    `Analyze this infrastructure and provide findings, risks, and recommendations:\n${prompt || infrastructure || data || JSON.stringify(req.body)}`,
+    res
+  );
+});
+
+// Security auditor
+app.post("/api/ai/security-audit", async (req, res) => {
+  const { prompt, infrastructure, data } = req.body ?? {};
+
+  return runGemini(
+    `Perform a detailed cloud infrastructure security audit. Identify vulnerabilities, severity, and remediation steps:\n${prompt || infrastructure || data || JSON.stringify(req.body)}`,
+    res
+  );
+});
+
+// Cost optimizer
+app.post("/api/ai/cost-optimize", async (req, res) => {
+  const { prompt, infrastructure, data } = req.body ?? {};
+
+  return runGemini(
+    `Analyze this cloud infrastructure for cost optimization opportunities. Include estimated savings and recommendations:\n${prompt || infrastructure || data || JSON.stringify(req.body)}`,
+    res
+  );
+});
+
+// Log analyzer
+app.post("/api/ai/analyze-logs", async (req, res) => {
+  const { prompt, logs, data } = req.body ?? {};
+
+  return runGemini(
+    `Analyze these infrastructure logs. Identify errors, root causes, and recommended fixes:\n${prompt || logs || data || JSON.stringify(req.body)}`,
+    res
+  );
+});
+
+// Architecture generator
+app.post("/api/ai/generate-architecture", async (req, res) => {
+  const { prompt, requirements, data } = req.body ?? {};
+
+  return runGemini(
+    `Design a cloud architecture for these requirements. Explain components, connections, scalability, and security:\n${prompt || requirements || data || JSON.stringify(req.body)}`,
+    res
+  );
+});
+
+// Documentation generator
+app.post("/api/ai/generate-docs", async (req, res) => {
+  const { prompt, project, data } = req.body ?? {};
+
+  return runGemini(
+    `Generate clear technical documentation for this project:\n${prompt || project || data || JSON.stringify(req.body)}`,
+    res
+  );
+});
+
+// Interview coach
+app.post("/api/ai/interview-coach", async (req, res) => {
+  const { prompt, question, data } = req.body ?? {};
+
+  return runGemini(
+    `Act as a cloud and DevOps interview coach. Help with this question and provide a clear explanation:\n${prompt || question || data || JSON.stringify(req.body)}`,
+    res
+  );
+});
+
+// Vercel detects this exported Express app.
+export default app;
