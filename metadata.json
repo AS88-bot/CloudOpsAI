@@ -1,0 +1,6 @@
+{
+  "name": "CloudOps AI",
+  "description": "Enterprise-grade AI platform for cloud infrastructure analysis, optimization, and management.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

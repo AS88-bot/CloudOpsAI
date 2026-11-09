@@ -1,0 +1,47 @@
+{
+  "firestore": {
+    "collections": {
+      "users": {
+        "description": "Stores user profiles and cloud configuration preferences",
+        "documents": {
+          "uid": {
+            "email": "string",
+            "displayName": "string",
+            "preferences": {
+              "theme": "string",
+              "notifications": "boolean"
+            },
+            "createdAt": "timestamp"
+          }
+        }
+      },
+      "analysis_history": {
+        "description": "Stores history of all AI infrastructure analyses and security audits",
+        "documents": {
+          "analysisId": {
+            "userId": "string",
+            "type": "string",
+            "fileName": "string",
+            "rawContent": "string",
+            "aiResponse": "string",
+            "severity": "string",
+            "timestamp": "timestamp"
+          }
+        }
+      },
+      "architecture_blueprints": {
+        "description": "Stores AI-generated cloud architectures",
+        "documents": {
+          "blueprintId": {
+            "userId": "string",
+            "prompt": "string",
+            "components": "array",
+            "estimatedCost": "number",
+            "diagramUrl": "string",
+            "timestamp": "timestamp"
+          }
+        }
+      }
+    }
+  }
+}
